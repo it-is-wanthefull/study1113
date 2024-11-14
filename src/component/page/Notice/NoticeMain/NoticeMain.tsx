@@ -3,57 +3,56 @@ import { StyledTable, StyledTd, StyledTh } from '../../../common/styled/StyledTa
 import { useEffect, useState } from 'react';
 import axios, { AxiosResponse } from 'axios';
 import { useRecoilState } from 'recoil';
-// import { modalState } from '../../../../stores/modalState';
 import { Portal } from '../../../common/potal/Portal';
 import { NoticeModal } from '../NoticeModal/NoticeModal';
 import { Button } from 'react-bootstrap';
 import { modalState } from '../../../../stores/modalState';
-
-interface INotice {
-    noticeIdx: number;
-    title: string;
-    // content: string;
-    author: string;
-    createdDate: string;
-    // updatedDate: string | null;
-    // fileName: string | null;
-    // phsycalPath: string | null;
-    // logicalPath: string | null;
-    // fileSize: number;
-    // fileExt: string | null;
-}
+import { INotice, INoticeListResponse } from '../../../../models/interface/INotice';
+import { postNoticeApi } from '../../../../api/postNoticeApi';
+import { Notice } from '../../../../api/api';
 
 export const NoticeMain = () => {
-    const { search } = useLocation(); // NoticeSearch에서 navigate()로 띄운 URL쿼리를 로드, URL 중 search부분만 구조분해할당으로 가져옴
+    const { search } = useLocation();
     const [noticeList, setNoticeList] = useState<INotice[]>();
     const [listCount, setListCount] = useState<number>(0);
     const [modal, setModal] = useRecoilState<boolean>(modalState); // recoil에 저장된 state
+    const [index, setIndex] = useState<number>();
 
     useEffect(() => {
         searchNoticeList();
-    }, [search]);
+    }, [search]); // NoticeSearch에서 navigate()로 띄운 URL쿼리를 로드, URL 중 search부분만 구조분해할당으로 가져옴
 
-    const searchNoticeList = (currentPage?: number) => {
+    const searchNoticeList = async (currentPage?: number) => {
         currentPage = currentPage || 1;
         const searchParam = new URLSearchParams(search);
         searchParam.append('currentPage', currentPage.toString());
         searchParam.append('pageSize', '5');
 
-        axios.post('/board/noticeListJson.do', searchParam)
-            .then(res => {
-                setNoticeList(res.data.notice);
-                setListCount(res.data.noticeCnt);
-                console.log(res);
-            });
+        const searchList = await postNoticeApi<INoticeListResponse>(Notice.getList, searchParam);
+        if (searchList) {
+            setNoticeList(searchList.notice);
+            setListCount(searchList.noticeCnt);
+        }
+        // axios.post('/board/noticeListJson.do', searchParam)
+        //     .then(res => {
+        //         setNoticeList(res.data.notice);
+        //         setListCount(res.data.noticeCnt);
+        //     });
     }
 
-    const handlerModal = () => {
+    const handlerModal = (index: number) => {
         setModal(!modal);
+        setIndex(index);
+    }
+
+    const onPostSuccess = () => {
+        setModal(!modal);   
+        searchNoticeList(); // List 자동새로고침
     }
 
     return (
         <>
-            총 갯수 : 0 현재 페이지 : 0
+            총 갯수 : {listCount} 현재 페이지 : 0
             <StyledTable>
                 <thead>
                     <tr>
@@ -68,7 +67,7 @@ export const NoticeMain = () => {
                         noticeList?.length > 0 ? (
                             noticeList?.map((notice) => {
                                 return (
-                                    <tr key={notice.noticeIdx} onClick={handlerModal}>
+                                    <tr key={notice.noticeIdx} onClick={() => handlerModal(notice.noticeIdx)}>
                                         <StyledTd >{notice.noticeIdx}</StyledTd>
                                         <StyledTd >{notice.title}</StyledTd>
                                         <StyledTd >{notice.author}</StyledTd>
@@ -86,7 +85,7 @@ export const NoticeMain = () => {
             </StyledTable>
             {modal &&
                 <Portal>
-                    <NoticeModal />
+                    <NoticeModal onSuccess={onPostSuccess} noticeSeq={index} setNoticeSeq={setIndex} /> 
                 </Portal>
             }
         </>
