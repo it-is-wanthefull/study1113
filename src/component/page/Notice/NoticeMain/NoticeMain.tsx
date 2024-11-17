@@ -1,6 +1,6 @@
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { StyledTable, StyledTd, StyledTh } from '../../../common/styled/StyledTable';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import axios, { AxiosResponse } from 'axios';
 import { useRecoilState } from 'recoil';
 import { Portal } from '../../../common/potal/Portal';
@@ -10,28 +10,40 @@ import { modalState } from '../../../../stores/modalState';
 import { INotice, INoticeListResponse } from '../../../../models/interface/INotice';
 import { postNoticeApi } from '../../../../api/postNoticeApi';
 import { Notice } from '../../../../api/api';
+import { PageNavigate } from '../../../common/pageNavigation/PageNavigate';
+import { NoticeContext } from '../../../../api/provider/NoticeProvider';
 
 export const NoticeMain = () => {
     const { search } = useLocation();
+    const navigate = useNavigate();
     const [noticeList, setNoticeList] = useState<INotice[]>();
     const [listCount, setListCount] = useState<number>(0);
     const [modal, setModal] = useRecoilState<boolean>(modalState); // recoil에 저장된 state
     const [index, setIndex] = useState<number>();
+    const [cPage, setCPage] = useState<number>();
+    const { searchKeyWord } = useContext(NoticeContext);
+
+    // useEffect(() => {
+    //     searchNoticeList();
+    // }, [search]); // NoticeSearch에서 navigate()로 띄운 URL쿼리를 로드, URL 중 search부분만 구조분해할당으로 가져옴
 
     useEffect(() => {
+        console.log(searchKeyWord);
         searchNoticeList();
-    }, [search]); // NoticeSearch에서 navigate()로 띄운 URL쿼리를 로드, URL 중 search부분만 구조분해할당으로 가져옴
+    }, [searchKeyWord])
 
     const searchNoticeList = async (currentPage?: number) => {
         currentPage = currentPage || 1;
-        const searchParam = new URLSearchParams(search);
-        searchParam.append('currentPage', currentPage.toString());
-        searchParam.append('pageSize', '5');
+        const searchParam = { ...searchKeyWord, currentPage: currentPage.toString(), pageSize: '5' };
+        // const searchParam = new URLSearchParams(search);
+        // searchParam.append('currentPage', currentPage.toString());
+        // searchParam.append('pageSize', '5');
 
-        const searchList = await postNoticeApi<INoticeListResponse>(Notice.getList, searchParam);
+        const searchList = await postNoticeApi<INoticeListResponse>(Notice.getListBody, searchParam);
         if (searchList) {
             setNoticeList(searchList.notice);
             setListCount(searchList.noticeCnt);
+            setCPage(currentPage);
         }
         // axios.post('/board/noticeListJson.do', searchParam)
         //     .then(res => {
@@ -48,6 +60,10 @@ export const NoticeMain = () => {
     const onPostSuccess = () => {
         setModal(!modal);   
         searchNoticeList(); // List 자동새로고침
+    }
+
+    const handlerDynamicRouter = (noticeIdx:string) => {
+        navigate(noticeIdx);
     }
 
     return (
@@ -67,7 +83,13 @@ export const NoticeMain = () => {
                         noticeList?.length > 0 ? (
                             noticeList?.map((notice) => {
                                 return (
-                                    <tr key={notice.noticeIdx} onClick={() => handlerModal(notice.noticeIdx)}>
+                                    // <tr key={notice.noticeIdx} onClick={() => handlerModal(notice.noticeIdx)}>
+                                    <tr key={notice.noticeIdx} 
+                                        onClick={() => 
+                                            navigate(`${notice.noticeIdx}`, {
+                                                state: { title: notice.title }
+                                            })
+                                        }>
                                         <StyledTd >{notice.noticeIdx}</StyledTd>
                                         <StyledTd >{notice.title}</StyledTd>
                                         <StyledTd >{notice.author}</StyledTd>
@@ -83,6 +105,7 @@ export const NoticeMain = () => {
                     }
                 </tbody>
             </StyledTable>
+            <PageNavigate totalItemsCount={listCount} onChange={searchNoticeList} activePage={cPage} itemsCountPerPage={5}/>
             {modal &&
                 <Portal>
                     <NoticeModal onSuccess={onPostSuccess} noticeSeq={index} setNoticeSeq={setIndex} /> 

@@ -1,7 +1,7 @@
 import { NoticeModalStyled } from './styled';
 import { RecoilState, useRecoilState, useResetRecoilState } from 'recoil';
 import { modalState } from '../../../../stores/modalState';
-import { FC, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, FC, useEffect, useRef, useState } from 'react';
 import { loginInfoState } from '../../../../stores/userInfo';
 import { ILoginInfo } from '../../../../models/interface/store/userInfo';
 import axios, { AxiosResponse } from 'axios';
@@ -19,6 +19,8 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
     const [modal, setModal] = useRecoilState<boolean>(modalState); // recoil에 저장된 state
     const [userInfo] = useRecoilState<ILoginInfo>(loginInfoState);
     const [noticeDetail, setNoticeDetail] = useState<INoticeDetail>();
+    const [imageUrl, setImageUrl] = useState<string>();
+    const [fileData, setFileData] = useState<File>();
     const title = useRef<HTMLInputElement>();
     const context = useRef<HTMLInputElement>();
 
@@ -27,26 +29,26 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
 
         return () => {
             noticeSeq && setNoticeSeq(undefined);
-        }; // useEffect빈배열(modal열릴때)은 가동될때 작동, return문은 종료될때(modal닫힐때) 작동
-        // if (noticeSeq) {
-        //     searchDetail();
-        //     return () => {
-        //         setNoticeSeq(undefined);
-        //     }
-        // }
+        };
     }, []);
 
     const handlerModal = () => {
         setModal(!modal);
     };
 
-    const searchDetail = async () => {
-        const param = {
-            noticeSeq,
-        }
-        const detail = await postNoticeApi<IDetailResponse>(Notice.getDetail, param)
-        if (detail) {
-            setNoticeDetail(detail.detail);
+    const handlerFile = (e: ChangeEvent<HTMLInputElement>) => {
+        const fileInfo = e.target.files;
+        if(fileInfo?.length > 0) {
+            const fileInfoSplit = fileInfo[0].name.split('.');
+            const fileLowerCase = fileInfoSplit[1].toLowerCase();
+            
+            if (fileLowerCase === "jpg" || fileLowerCase === "gif" || fileLowerCase === "png") {
+                setImageUrl(URL.createObjectURL(fileInfo[0]));
+            }
+            else {
+                setImageUrl('')
+            }
+            setFileData(fileInfo[0])
         }
     }
 
@@ -62,6 +64,37 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
         }
     };
 
+    const handlerFileSave = async () => {
+        const fileForm = new FormData();
+        const textData = {
+            title: title.current.value,
+            context: context.current.value,
+            loginId: userInfo.loginId,
+        };
+        fileData && fileForm.append('file', fileData);
+        fileForm.append('text', new Blob([JSON.stringify(textData)], {type: 'application/json'}));
+        const save = await postNoticeApi<IPostResponse>(Notice.getFileSave, fileForm)
+        if (save) {
+            save.result === 'success' && onSuccess();
+        }
+    };
+
+    const searchDetail = async () => {
+        const param = {
+            noticeSeq,
+        }
+        const detail = await postNoticeApi<IDetailResponse>(Notice.getDetail, param)
+        if (detail) {
+            setNoticeDetail(detail.detail);
+            const { fileExt, logicalPath } = detail.detail;
+            if (fileExt === "jpg" || fileExt === "gif" || fileExt === "png") {
+                setImageUrl(logicalPath);
+            } else {
+                setImageUrl('');
+            }
+        }
+    }
+
     const handlerUpdate = async () => {
         const param = {
             title: title.current.value,
@@ -74,6 +107,21 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
         }
     }
 
+    const handlerFileUpdate = async () => {
+        const fileForm = new FormData();
+        const textData = {
+            title: title.current.value,
+            context: context.current.value,
+            noticeSeq,
+        };
+        fileData && fileForm.append('file', fileData);
+        fileForm.append('text', new Blob([JSON.stringify(textData)], {type: 'application/json'}));
+        const save = await postNoticeApi<IPostResponse>(Notice.getFileUpdate, fileForm)
+        if (save) {
+            save.result === 'success' && onSuccess();
+        }
+    };
+
     const handlerDelete = async () => {
         const param = {
             noticeSeq,
@@ -84,6 +132,21 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
         }
     }
 
+    const handlerFileDelete = async () => {
+        const fileForm = new FormData();
+        const textData = {
+            title: title.current.value,
+            context: context.current.value,
+            noticeSeq,
+        };
+        fileData && fileForm.append('file', fileData);
+        fileForm.append('text', new Blob([JSON.stringify(textData)], {type: 'application/json'}));
+        const save = await postNoticeApi<IPostResponse>(Notice.getFileUpdate, fileForm)
+        if (save) {
+            save.result === 'success' && onSuccess();
+        }
+    };
+
     return (
         <NoticeModalStyled>
             <div className="container">
@@ -93,19 +156,26 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
                 <label>
                     내용 : <input type="text" ref={context} defaultValue={noticeDetail?.content}></input>
                 </label>
-                    파일 :<input type="file" id="fileInput" style={{ display: 'none' }}></input>
+                    파일 :<input type="file" id="fileInput" style={{ display: 'none' }} onChange={handlerFile}></input>
                 <label className="img-label" htmlFor="fileInput">
                     파일 첨부하기
                 </label>
                 <div>
-                    <div>
-                        <label>미리보기</label>
-                        <img src="" />
-                    </div>
+                    {imageUrl ?
+                        <div>
+                            <label>미리보기</label>
+                            <img src={imageUrl} />
+                            {fileData?.name || noticeDetail.fileName}
+                        </div>
+                        :
+                        <div>
+                            {fileData?.name}
+                        </div>
+                    }
                 </div>
                 <div className={'button-container'}>
-                    <button onClick={noticeSeq ? handlerUpdate : handlerSave}>{noticeSeq ? "수정" : "등록"}</button>
-                    {noticeSeq && <button onClick={handlerDelete}>삭제</button>}
+                    <button onClick={noticeSeq ? (fileData ? handlerFileUpdate : handlerUpdate) : (fileData ? handlerFileSave : handlerSave)}>{noticeSeq ? "수정" : "등록"}</button>
+                    {noticeSeq && <button onClick={fileData ? handlerFileDelete : handlerDelete}>삭제</button>}
                     <button onClick={handlerModal}>나가기</button>
                 </div>
             </div>
