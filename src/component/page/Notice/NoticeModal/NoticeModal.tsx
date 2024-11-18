@@ -4,7 +4,7 @@ import { modalState } from '../../../../stores/modalState';
 import { ChangeEvent, FC, useEffect, useRef, useState } from 'react';
 import { loginInfoState } from '../../../../stores/userInfo';
 import { ILoginInfo } from '../../../../models/interface/store/userInfo';
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { IDetailResponse, INoticeDetail, IPostResponse } from '../../../../models/interface/INotice';
 import { postNoticeApi } from '../../../../api/postNoticeApi';
 import { Notice } from '../../../../api/api';
@@ -146,6 +146,31 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
             save.result === 'success' && onSuccess();
         }
     };
+    
+    const downloadFile = async () => {
+        const param = new URLSearchParams();
+        param.append('noticeSeq', noticeSeq.toString());
+
+        const postAction: AxiosRequestConfig = {
+            url: '/board/noticeDownload.do',
+            method: 'POST',
+            data: param,
+            responseType: 'blob', // binary타입
+        };
+
+        await axios(postAction)
+            .then((res) => {
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', noticeDetail?.fileName as string); // as는 약간 불확신한 타입에 대하 string를 의도했다는 개발자의 명시
+                document.body.appendChild(link);
+                link.click(); // 사용자에겐 안보이는 a태그를 작동시키기 위함
+
+                link.remove();
+            });
+    };
+
 
     return (
         <NoticeModalStyled>
@@ -160,7 +185,7 @@ export const NoticeModal: FC<INoticeModalProps> = ({ onSuccess, noticeSeq, setNo
                 <label className="img-label" htmlFor="fileInput">
                     파일 첨부하기
                 </label>
-                <div>
+                <div onClick = {downloadFile}>
                     {imageUrl ?
                         <div>
                             <label>미리보기</label>

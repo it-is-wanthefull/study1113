@@ -83,13 +83,13 @@ export const NoticeMain = () => {
                         noticeList?.length > 0 ? (
                             noticeList?.map((notice) => {
                                 return (
-                                    // <tr key={notice.noticeIdx} onClick={() => handlerModal(notice.noticeIdx)}>
-                                    <tr key={notice.noticeIdx} 
+                                    <tr key={notice.noticeIdx} onClick={() => handlerModal(notice.noticeIdx)}>
+                                    {/* <tr key={notice.noticeIdx} 
                                         onClick={() => 
                                             navigate(`${notice.noticeIdx}`, {
                                                 state: { title: notice.title }
                                             })
-                                        }>
+                                        }> */}
                                         <StyledTd >{notice.noticeIdx}</StyledTd>
                                         <StyledTd >{notice.title}</StyledTd>
                                         <StyledTd >{notice.author}</StyledTd>
